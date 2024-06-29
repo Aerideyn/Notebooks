@@ -74,50 +74,13 @@ def assemble_diffusion_matrix(n_rows, n_columns, dx, dy, dz, diffusion_coefficie
 
     return coefficient_matrix
 
-def assemble_advection_matrix(n_rows, n_columns, dx, dy, dz, rho, u ,v):
-    # the coefficient matrix
-    coefficient_matrix = np.zeros([n_nodes, n_nodes])
-    for row in range(n_rows):
-        for column in range(n_columns):
-            node_id_C = get_node_id(row, column)
-            
-            # insert east neighbor into A
-            if column < n_columns -1:
-                mdot = rho * (u[node_id_C] + u[get_node_id(row, column + 1)]) / 2
-                a1 = mdot * (dy*dz) / 2
-                coefficient_matrix[node_id_C][get_node_id(row, column + 1)] = a1
-                coefficient_matrix[node_id_C][node_id_C] += a1
-
-            #insert north neighbor into A
-            if row > 0:
-                mdot = rho * (v[node_id_C] + v[get_node_id(row - 1, column)]) / 2
-                a2 = mdot * (dx*dz) / 2
-                coefficient_matrix[node_id_C][get_node_id(row - 1, column)] = a2
-                coefficient_matrix[node_id_C][node_id_C] += a2
-
-            #insert west neighbor into A
-            if column > 0:
-                mdot = rho * (u[node_id_C] + u[get_node_id(row, column - 1)]) / 2
-                a3 = -mdot * (dy*dz) / 2
-                coefficient_matrix[node_id_C][get_node_id(row, column - 1)] = a3
-                coefficient_matrix[node_id_C][node_id_C] += a3
-
-            # insert south neighbor into A
-            if row < n_rows -1:
-                mdot = rho * (v[node_id_C] + v[get_node_id(row + 1, column)]) / 2
-                a4 = -mdot * (dx*dz) / 2
-                coefficient_matrix[node_id_C][get_node_id(row + 1, column)] = a4
-                coefficient_matrix[node_id_C][node_id_C] += a4
-
-    return coefficient_matrix
-
 def apply_dirichlet_boundary_conditions(coefficient_matrix, source_vector, node_id, value):
-    coefficient_matrix[node_id][:] = 0
-    coefficient_matrix[node_id][node_id] = 1
-    source_vector[node_id] = value
+    ab = -conductivity * (dy*dz) / (dx / 2.0)
+    source_vector[node_id] -= ab * value
+    coefficient_matrix[node_id][node_id] -= ab
 
 def apply_neumann_boundary_conditions(source_vector, node_id, value):
-    source_vector[node_id] = value
+    source_vector[node_id] += value
 
 def solve_linear_system(coeff_matrix, constant_vector, initial_guess, tolerance, max_iterations):
     preconditioner = np.diag(1 / np.diag(coeff_matrix))
@@ -127,8 +90,8 @@ def solve_linear_system(coeff_matrix, constant_vector, initial_guess, tolerance,
     return solution
 
 
-n_rows        = 20
-n_columns     = 20
+n_rows        = 101
+n_columns     = 101
 n_nodes       = n_rows*n_columns
 conductivity  = 237 #alu w/m/k
 rho           = 1   # air kg/m3
@@ -165,8 +128,8 @@ for row in range(n_rows):
     apply_neumann_boundary_conditions(source_vector, get_node_id(row, n_columns - 1), 1000 * (dx*dz))
 
 
-T = solve_linear_system(coefficient_matrix, source_vector, solution_vector, 1e-6, 10000)
-#T = conjugate_gradient(coefficient_matrix, source_vector, solution_vector, 1e-6, 10000)
+#T = solve_linear_system(coefficient_matrix, source_vector, solution_vector, 1e-6, 10000)
+T = conjugate_gradient(coefficient_matrix, source_vector, solution_vector, 1e-6, 10000)
 #T = gauss_seidel(coefficient_matrix, source_vector, solution_vector, 1e-6, 10000)
 
 import matplotlib.pyplot as plt
